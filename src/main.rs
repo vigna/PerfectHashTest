@@ -20,19 +20,20 @@ fn main() {
 
     let mut map = HashMap::with_capacity(n);
 
-    for _ in 0..n {
-        map.insert(r.next_u64(), r.next_u64());
-    }
+    let mut keys = Vec::with_capacity(n);
+    keys.resize_with(n, || r.next_u64());
 
-    let mut keys = map.keys().copied().collect::<Vec<_>>();
+    keys.iter().for_each(|&k| {
+        map.insert(k, k);
+    });
+
+    keys.shuffle(&mut r);
 
     let ptr_hash = <PtrHash>::new(keys.as_slice(), PtrHashParams::default());
     let mut values = vec![0; keys.len()];
     map.iter().for_each(|(k, v)| {
         values[ptr_hash.index(k)] = *v;
     });
-
-    keys.shuffle(&mut r);
 
     let now = Instant::now();
     for i in 0..n {
@@ -71,7 +72,7 @@ fn main() {
             values[phast.get(&keys[i]).unwrap() as usize],
             *map.get(&keys[i]).unwrap()
         );
-        _ = black_box(values[phast.get(&keys[i]).unwrap() as usize]);
+        _ = black_box(values[unsafe { phast.get(&keys[i]).unwrap_unchecked() } as usize]);
     }
     println!(
         "Phast   lookup time {:8.3}µs",
