@@ -2,7 +2,7 @@ use core::hint::black_box;
 use std::{collections::HashMap, time::Instant};
 
 use clap::Parser;
-use ph::fmph;
+use ph::phast;
 use ptr_hash::{PtrHash, PtrHashParams};
 use rand::{RngCore, SeedableRng, rngs::SmallRng, seq::SliceRandom};
 
@@ -67,21 +67,21 @@ fn main() {
 
     drop(ptr_hash);
 
-    let phast = fmph::Function::from(keys.as_ref());
+    let phast = phast::Function2::from_slice_mt(&keys);
 
     let mut values = vec![0; keys.len()];
     map.iter().for_each(|(k, v)| {
-        values[phast.get(k).unwrap() as usize] = *v;
+        values[phast.get(k) as usize] = *v;
     });
 
     for _ in 0..2 {
         let now = Instant::now();
         for i in 0..n {
             debug_assert_eq!(
-                values[phast.get(&keys[i]).unwrap() as usize],
+                values[phast.get(&keys[i]) as usize],
                 *map.get(&keys[i]).unwrap()
             );
-            _ = black_box(values[unsafe { phast.get(&keys[i]).unwrap_unchecked() } as usize]);
+            _ = black_box(values[phast.get(&keys[i])]);
         }
         println!(
             "Phast   lookup time {:8.3}µs",
