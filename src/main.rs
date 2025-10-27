@@ -1,11 +1,13 @@
 use core::hint::black_box;
-use gxhash::HashMap as GxHashMap;
+use dsi_progress_logger::no_logging;
+use gxhash::HashMap;
 use std::time::Instant;
+use sux::{func::VBuilder, utils::FromIntoIterator};
 
 use clap::Parser;
 use ph::phast;
 use ptr_hash::{PtrHash, PtrHashParams};
-use rand::{rngs::SmallRng, seq::SliceRandom, RngCore, SeedableRng};
+use rand::{RngCore, SeedableRng, rngs::SmallRng, seq::SliceRandom};
 
 #[derive(Parser, Debug)]
 #[command(about = "Build contributor and origin collaboration graphs")]
@@ -23,22 +25,20 @@ fn main() {
     keys.resize_with(n, || r.next_u64());
 
     // GxHashMap
-    let mut map = GxHashMap::with_capacity_and_hasher(n, Default::default());
+    let mut map = HashMap::with_capacity_and_hasher(n, Default::default());
     keys.iter().for_each(|&k| {
         map.insert(k, k);
     });
     keys.shuffle(&mut r);
 
-    for _ in 0..2 {
-        let now = Instant::now();
-        for i in 0..n {
-            let _: _ = black_box(*unsafe { map.get(&keys[i]).unwrap_unchecked() });
-        }
-        println!(
-            "GxHM     lookup time {:8.3}ns",
-            now.elapsed().as_nanos() as f64 / n as f64
-        );
+    let now = Instant::now();
+    for i in 0..n {
+        let _: _ = black_box(*unsafe { map.get(&keys[i]).unwrap_unchecked() });
     }
+    println!(
+        "GxHM     lookup time {:8.3}ns",
+        now.elapsed().as_nanos() as f64 / n as f64
+    );
 
     // PtrHash
 
@@ -48,20 +48,18 @@ fn main() {
         values[ptr_hash.index(k)] = *v;
     });
 
-    for _ in 0..2 {
-        let now = Instant::now();
-        for i in 0..n {
-            debug_assert_eq!(
-                values[ptr_hash.index(&keys[i])],
-                *map.get(&keys[i]).unwrap()
-            );
-            _ = black_box(values[ptr_hash.index(&keys[i])]);
-        }
-        println!(
-            "PtrHash  lookup time {:8.3}ns",
-            now.elapsed().as_nanos() as f64 / n as f64
+    let now = Instant::now();
+    for i in 0..n {
+        debug_assert_eq!(
+            values[ptr_hash.index(&keys[i])],
+            *map.get(&keys[i]).unwrap()
         );
+        _ = black_box(values[ptr_hash.index(&keys[i])]);
     }
+    println!(
+        "PtrHash  lookup time {:8.3}ns",
+        now.elapsed().as_nanos() as f64 / n as f64
+    );
 
     drop(ptr_hash);
 
@@ -72,18 +70,36 @@ fn main() {
         values[phast.get(k) as usize] = *v;
     });
 
-    for _ in 0..2 {
-        let now = Instant::now();
-        for i in 0..n {
-            debug_assert_eq!(
-                values[phast.get(&keys[i]) as usize],
-                *map.get(&keys[i]).unwrap()
-            );
-            _ = black_box(values[phast.get(&keys[i])]);
-        }
-        println!(
-            "Phast    lookup time {:8.3}ns",
-            now.elapsed().as_nanos() as f64 / n as f64
+    let now = Instant::now();
+    for i in 0..n {
+        debug_assert_eq!(
+            values[phast.get(&keys[i]) as usize],
+            *map.get(&keys[i]).unwrap()
         );
+        _ = black_box(values[phast.get(&keys[i])]);
     }
+    println!(
+        "Phast    lookup time {:8.3}ns",
+        now.elapsed().as_nanos() as f64 / n as f64
+    );
+
+    drop(phast);
+
+    let vfunc = VBuilder::<_, Box<[_]>, _>::default()
+        .try_build_func(
+            FromIntoIterator::from(keys.clone()),
+            FromIntoIterator::from(keys.clone()),
+            no_logging![],
+        )
+        .unwrap();
+
+    let now = Instant::now();
+    for i in 0..n {
+        debug_assert_eq!(vfunc.get(&keys[i]), *map.get(&keys[i]).unwrap());
+        _ = black_box(vfunc.get(&keys[i]));
+    }
+    println!(
+        "VFunc    lookup time {:8.3}ns",
+        now.elapsed().as_nanos() as f64 / n as f64
+    );
 }
