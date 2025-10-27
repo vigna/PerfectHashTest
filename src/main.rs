@@ -29,33 +29,41 @@ fn main() {
 
     keys.shuffle(&mut r);
 
+    // HashMAp
+
+    for _ in 0..2 {
+        let now = Instant::now();
+        for i in 0..n {
+            let _: _ = black_box(*unsafe { map.get(&keys[i]).unwrap_unchecked() });
+        }
+        println!(
+            "HashMap lookup time {:8.3}µs",
+            now.elapsed().as_nanos() as f64 / 1000.0
+        );
+    }
+
+    // PtrHash
+
     let ptr_hash = <PtrHash>::new(keys.as_slice(), PtrHashParams::default());
     let mut values = vec![0; keys.len()];
     map.iter().for_each(|(k, v)| {
         values[ptr_hash.index(k)] = *v;
     });
 
-    let now = Instant::now();
-    for i in 0..n {
-        let _: _ = black_box(*unsafe { map.get(&keys[i]).unwrap_unchecked() });
-    }
-    println!(
-        "HashMap lookup time {:8.3}µs",
-        now.elapsed().as_nanos() as f64 / 1000.0
-    );
-
-    let now = Instant::now();
-    for i in 0..n {
-        debug_assert_eq!(
-            values[ptr_hash.index(&keys[i])],
-            *map.get(&keys[i]).unwrap()
+    for _ in 0..2 {
+        let now = Instant::now();
+        for i in 0..n {
+            debug_assert_eq!(
+                values[ptr_hash.index(&keys[i])],
+                *map.get(&keys[i]).unwrap()
+            );
+            _ = black_box(values[ptr_hash.index(&keys[i])]);
+        }
+        println!(
+            "PtrHash lookup time {:8.3}µs",
+            now.elapsed().as_nanos() as f64 / 1000.0
         );
-        _ = black_box(values[ptr_hash.index(&keys[i])]);
     }
-    println!(
-        "PtrHash lookup time {:8.3}µs",
-        now.elapsed().as_nanos() as f64 / 1000.0
-    );
 
     drop(ptr_hash);
 
@@ -66,16 +74,18 @@ fn main() {
         values[phast.get(k).unwrap() as usize] = *v;
     });
 
-    let now = Instant::now();
-    for i in 0..n {
-        debug_assert_eq!(
-            values[phast.get(&keys[i]).unwrap() as usize],
-            *map.get(&keys[i]).unwrap()
+    for _ in 0..2 {
+        let now = Instant::now();
+        for i in 0..n {
+            debug_assert_eq!(
+                values[phast.get(&keys[i]).unwrap() as usize],
+                *map.get(&keys[i]).unwrap()
+            );
+            _ = black_box(values[unsafe { phast.get(&keys[i]).unwrap_unchecked() } as usize]);
+        }
+        println!(
+            "Phast   lookup time {:8.3}µs",
+            now.elapsed().as_nanos() as f64 / 1000.0
         );
-        _ = black_box(values[unsafe { phast.get(&keys[i]).unwrap_unchecked() } as usize]);
     }
-    println!(
-        "Phast   lookup time {:8.3}µs",
-        now.elapsed().as_nanos() as f64 / 1000.0
-    );
 }
