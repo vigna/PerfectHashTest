@@ -1,10 +1,12 @@
 use core::hint::black_box;
+use fxhash::FxHashMap;
+use gxhash::HashMap as GxHashMap;
 use std::{collections::HashMap, time::Instant};
 
 use clap::Parser;
 use ph::phast;
 use ptr_hash::{PtrHash, PtrHashParams};
-use rand::{RngCore, SeedableRng, rngs::SmallRng, seq::SliceRandom};
+use rand::{rngs::SmallRng, seq::SliceRandom, RngCore, SeedableRng};
 
 #[derive(Parser, Debug)]
 #[command(about = "Build contributor and origin collaboration graphs")]
@@ -18,18 +20,15 @@ fn main() {
 
     let n = args.n;
 
-    let mut map = HashMap::with_capacity(n);
-
     let mut keys = Vec::with_capacity(n);
     keys.resize_with(n, || r.next_u64());
 
+    // FxHashMap
+    let mut map = HashMap::with_capacity(n);
     keys.iter().for_each(|&k| {
         map.insert(k, k);
     });
-
     keys.shuffle(&mut r);
-
-    // HashMAp
 
     for _ in 0..2 {
         let now = Instant::now();
@@ -37,8 +36,44 @@ fn main() {
             let _: _ = black_box(*unsafe { map.get(&keys[i]).unwrap_unchecked() });
         }
         println!(
-            "HashMap lookup time {:8.3}µs",
-            now.elapsed().as_nanos() as f64 / 1000.0
+            "HashMap  lookup time {:8.3}ns",
+            now.elapsed().as_nanos() as f64 / n as f64
+        );
+    }
+
+    // FxHashMap
+    let mut map = FxHashMap::with_capacity_and_hasher(n, Default::default());
+    keys.iter().for_each(|&k| {
+        map.insert(k, k);
+    });
+    keys.shuffle(&mut r);
+
+    for _ in 0..2 {
+        let now = Instant::now();
+        for i in 0..n {
+            let _: _ = black_box(*unsafe { map.get(&keys[i]).unwrap_unchecked() });
+        }
+        println!(
+            "FxHM     lookup time {:8.3}ns",
+            now.elapsed().as_nanos() as f64 / n as f64
+        );
+    }
+
+    // GxHashMap
+    let mut map = GxHashMap::with_capacity_and_hasher(n, Default::default());
+    keys.iter().for_each(|&k| {
+        map.insert(k, k);
+    });
+    keys.shuffle(&mut r);
+
+    for _ in 0..2 {
+        let now = Instant::now();
+        for i in 0..n {
+            let _: _ = black_box(*unsafe { map.get(&keys[i]).unwrap_unchecked() });
+        }
+        println!(
+            "GxHM     lookup time {:8.3}ns",
+            now.elapsed().as_nanos() as f64 / n as f64
         );
     }
 
@@ -60,8 +95,8 @@ fn main() {
             _ = black_box(values[ptr_hash.index(&keys[i])]);
         }
         println!(
-            "PtrHash lookup time {:8.3}µs",
-            now.elapsed().as_nanos() as f64 / 1000.0
+            "PtrHash  lookup time {:8.3}ns",
+            now.elapsed().as_nanos() as f64 / n as f64
         );
     }
 
@@ -84,8 +119,8 @@ fn main() {
             _ = black_box(values[phast.get(&keys[i])]);
         }
         println!(
-            "Phast   lookup time {:8.3}µs",
-            now.elapsed().as_nanos() as f64 / 1000.0
+            "Phast    lookup time {:8.3}ns",
+            now.elapsed().as_nanos() as f64 / n as f64
         );
     }
 }
