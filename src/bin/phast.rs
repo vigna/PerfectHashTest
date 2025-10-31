@@ -3,6 +3,9 @@ use std::time::Instant;
 
 use clap::Parser;
 use ph::phast;
+use sux::bits::BitVec;
+#[cfg(feature = "checks")]
+use sux::traits::BitVecOpsMut;
 
 #[derive(Parser, Debug)]
 #[command(about = "Build contributor and origin collaboration graphs")]
@@ -22,14 +25,21 @@ fn main() {
         now.elapsed().as_nanos() as f64 / n as f64
     );
 
-    for _ in 0..2 {
-        let now = Instant::now();
-        for i in 0..n {
-            _ = black_box(phast.get(&i));
+    let mut _bv = BitVec::new(n);
+
+    let now = Instant::now();
+    for i in 0..n {
+        let _x = black_box(phast.get(&i));
+        #[cfg(feature = "checks")]
+        {
+            if _bv[_x] {
+                panic!("Duplicate key found");
+            }
+            _bv.set(_x, true);
         }
-        println!(
-            "Phast   lookup time {:8.3}ns/key",
-            now.elapsed().as_nanos() as f64 / n as f64
-        );
     }
+    println!(
+        "Phast   lookup time {:8.3}ns/key",
+        now.elapsed().as_nanos() as f64 / n as f64
+    );
 }
